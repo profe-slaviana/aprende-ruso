@@ -119,16 +119,9 @@ function normalise(raw, problems) {
     meet: safeUrl(c.enlace),
     email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.contacto?.correo ?? '').trim())
       ? String(data.contacto.correo).trim() : null,
+    form: safeUrl(data.contacto?.formulario),
     description: String(data.proyecto?.descripcion ?? '').trim(),
     absences,
-    lessons: (Array.isArray(data.lecciones) ? data.lecciones : [])
-      .filter((l) => l && typeof l === 'object')
-      .map((l) => ({
-        number: l.numero, titleEs: String(l.titulo_es ?? ''), titleRu: String(l.titulo_ru ?? ''),
-        date: toDate(l.fecha), slides: safeUrl(l.presentacion), summary: safeUrl(l.resumen),
-        audio: safeUrl(l.audio), homework: safeUrl(l.tarea),
-      }))
-      .sort((a, b) => (Number(b.number) || 0) - (Number(a.number) || 0)),
   };
 }
 
@@ -173,15 +166,6 @@ function calendarUrl(d, now) {
     details: `${d.meet ?? ''}\n${location.href}`.trim(),
     location: d.meet ?? '',
   })}`;
-}
-
-// Google Slides / Canva share links → embeddable URLs; anything else as is.
-function embedUrl(url) {
-  const slides = url.match(/^https:\/\/docs\.google\.com\/presentation\/d\/(e\/)?([\w-]+)/);
-  if (slides) return `https://docs.google.com/presentation/d/${slides[1] ?? ''}${slides[2]}/embed`;
-  const canva = url.match(/^(https:\/\/www\.canva\.com\/design\/[\w-]+\/[\w-]+)\/view/);
-  if (canva) return `${canva[1]}/view?embed`;
-  return url;
 }
 
 // ── rendering ────────────────────────────────────────────────────────────────
@@ -229,61 +213,20 @@ function renderClass(d, now) {
   document.getElementById('clase').replaceChildren(button, when);
 }
 
-function renderLessons(d) {
-  const container = document.getElementById('lecciones');
-  if (!d.lessons.length) {
-    container.replaceChildren(el('p', { class: 'vacio' }, 'Pronto habrá materiales. ', ru('Материалы скоро появятся.')));
-    return;
-  }
-  container.replaceChildren(...d.lessons.map((l) => {
-    const viewer = el('div', { class: 'visor', hidden: true });
-    const toggle = l.slides && el('button', {
-      type: 'button', class: 'mini',
-      onclick: (e) => {
-        if (!viewer.firstChild) {
-          viewer.append(
-            el('iframe', { src: embedUrl(l.slides), title: `Presentación: ${l.titleEs}`, loading: 'lazy', allowfullscreen: true }),
-            link(l.slides, 'Abrir en otra pestaña', null),
-          );
-        }
-        viewer.hidden = !viewer.hidden;
-        e.currentTarget.textContent = viewer.hidden ? 'Ver presentación' : 'Ocultar presentación';
-      },
-    }, 'Ver presentación');
-    const audio = l.audio && (/\.(mp3|m4a|ogg|wav)(\?|$)/i.test(l.audio)
-      ? el('audio', { controls: true, preload: 'none', src: l.audio })
-      : link(l.audio, 'Audio'));
-    return el('article', { class: 'leccion' },
-      el('p', { class: 'numero' }, l.number != null ? `Lección ${l.number}` : 'Lección',
-        isDate(l.date) && el('span', { class: 'fecha' }, ` · ${fmtDate(l.date, 'es')}`)),
-      el('h3', {}, l.titleEs),
-      l.titleRu && el('p', { class: 'ru', lang: 'ru' }, l.titleRu),
-      el('div', { class: 'acciones' },
-        toggle,
-        l.summary && link(l.summary, 'Descargar resumen'),
-        l.homework && link(l.homework, 'Tarea'),
-        audio),
-      viewer);
-  }));
-}
-
-// The feedback form opens the student's mail app with the message filled in:
-// no server and no third-party form service.
+// Contact: the email address, plus the Google Form embedded when one is set.
 function renderContact(d) {
-  const section = document.getElementById('contacto');
-  if (!d.email) {
-    section.hidden = true;
+  if (!d.email && !d.form) {
+    document.getElementById('contacto').hidden = true;
     return;
   }
-  document.getElementById('correo').replaceChildren(el('a', { href: `mailto:${d.email}` }, d.email));
-  document.getElementById('formulario').addEventListener('submit', (e) => {
-    e.preventDefault();
-    const form = e.currentTarget;
-    const name = form.nombre.value.trim();
-    const body = `${form.mensaje.value.trim()}${name ? `\n\n— ${name}` : ''}`;
-    const subject = `Clases de ruso${name ? ` — ${name}` : ''}`;
-    location.href = `mailto:${d.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  });
+  const embed = d.form?.match(/^https:\/\/docs\.google\.com\/forms\/d\/e\/[\w-]+\/viewform/);
+  document.getElementById('contacto-cuerpo').replaceChildren(...[
+    d.email && el('p', {}, 'Preguntas, ideas o comentarios: ', el('a', { class: 'correo', href: `mailto:${d.email}` }, d.email)),
+    embed && el('iframe', {
+      class: 'formulario tarjeta', src: `${embed[0]}?embedded=true`, title: 'Formulario de contacto', loading: 'lazy',
+    }),
+    d.form && link(d.form, embed ? 'Abrir el formulario en otra pestaña' : 'Abrir el formulario', embed ? 'enlace' : 'boton'),
+  ].filter(Boolean));
 }
 
 function renderProblems(problems) {
@@ -308,7 +251,6 @@ async function main() {
   renderProblems(problems);
   renderStatus(d, now);
   renderClass(d, now);
-  renderLessons(d);
   renderContact(d);
   document.getElementById('descripcion').textContent = d.description;
 }

@@ -1,9 +1,8 @@
 # Aprende ruso con Slaviana
 
 Free Russian classes for students in Mexico, run as a volunteer project.
-The page tells students at a glance whether class is on today, links to the
-video call, shows the weekly schedule, and keeps every lesson's slides and
-materials in one place.
+The page tells students at a glance whether class is on, links to the video
+call, and shows when the weekly class takes place.
 
 **Site:** <https://profe-slaviana.github.io/aprende-ruso/>
 
@@ -23,10 +22,16 @@ updates within a few minutes, and this works from a phone too.
 | Show a short note under the status | `estado.mensaje` |
 | Change the class day, time or Google Meet link | `clase` (`dia`, `inicio`, `fin`, `enlace`) |
 | Change the contact address | `contacto.correo` |
-| Publish a new lesson | add an entry under `lecciones` |
+| Show a feedback form | `contacto.formulario` — a Google Form link |
 
-The "Escríbeme" form at the bottom needs no server: it opens the student's
-mail app with the message ready to send to `contacto.correo`.
+### Feedback form
+
+Create a form at [forms.google.com](https://forms.google.com) (for example
+"Nombre" and "Mensaje"), click **Send** → the link icon, and copy the long
+link (`https://docs.google.com/forms/d/e/…/viewform`) into
+`contacto.formulario`. The form then appears on the page, and answers arrive
+in the form's **Responses** tab. To get an email for every answer, turn on
+Responses → ⋮ → "Get email notifications for new responses".
 
 With `modo: auto` the status turns green, yellow or red on its own based on
 the `ausencias` dates. The "next class" line also skips those days, and on
@@ -34,13 +39,6 @@ return it tells students the date you're back.
 
 Mistakes don't break the page silently. If an entry can't be read, a red
 "Revisa datos.yml" box at the top of the page names it.
-
-### Presentations
-
-- **Google Slides:** Share → "Anyone with the link" → paste the link.
-- **Canva:** Share → "View-only link" → paste the link.
-- **PDF:** upload it to the repository (for example into `materiales/`) and
-  use `https://profe-slaviana.github.io/aprende-ruso/materiales/<file>.pdf`.
 
 ## A note on the call link
 

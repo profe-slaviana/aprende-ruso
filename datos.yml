@@ -23,6 +23,9 @@ clase:
 
 contacto:
   correo: slaviana.kustova@gmail.com
+  # A Google Form for feedback (Send → link icon → copy the long link,
+  # https://docs.google.com/forms/d/e/.../viewform). Leave "" to hide it.
+  formulario: ""
 
 ausencias:
   # Holidays and days off. While today falls inside one, the status switches
@@ -32,19 +35,6 @@ ausencias:
     hasta: 2027-01-08
     tipo: festivo
     motivo: Vacaciones de invierno / Новогодние каникулы
-
-lecciones:
-  # Newest lessons are shown first. Every link is optional: leave "" to hide it.
-  # presentacion: a Google Slides link (shared "anyone with the link"),
-  #               a Canva "view" link, or a PDF.
-  - numero: 1
-    titulo_es: El alfabeto cirílico
-    titulo_ru: Русский алфавит
-    fecha: 2026-11-15
-    presentacion: ""
-    resumen: ""
-    audio: ""
-    tarea: ""
 
 proyecto:
   descripcion: >-
