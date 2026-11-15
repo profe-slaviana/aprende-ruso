@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Aprende ruso con Slaviana</title>
+  <meta name="description" content="Clases de ruso gratuitas para estudiantes de México: horario, estado de las clases, enlace a la clase y materiales.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <header class="hero">
+    <h1>¡Aprende ruso con Slaviana!</h1>
+    <p class="ru" lang="ru">Учи русский со Славяной</p>
+  </header>
+
+  <main>
+    <div id="problemas" class="aviso" hidden></div>
+
+    <section id="estado" class="tarjeta estado" aria-live="polite">
+      <p class="cargando">Cargando… / Загрузка…</p>
+    </section>
+
+    <section id="entrar" class="entrar"></section>
+
+    <section class="bloque">
+      <h2>Horario <span class="ru" lang="ru">Расписание</span></h2>
+      <p class="nota">Hora del Centro de México (CDMX).</p>
+      <div id="filtros" class="filtros" role="group" aria-label="Filtrar horario"></div>
+      <div id="horario" class="horario"></div>
+    </section>
+
+    <section class="bloque">
+      <h2>Materiales <span class="ru" lang="ru">Материалы</span></h2>
+      <div id="lecciones" class="lecciones"></div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <h2>Sobre el proyecto <span class="ru" lang="ru">О проекте</span></h2>
+    <p id="descripcion"></p>
+    <p class="gratis">Proyecto educativo gratuito · <span lang="ru">Бесплатный образовательный проект</span></p>
+  </footer>
+
+  <noscript><p class="aviso">Esta página necesita JavaScript. / Для этой страницы нужен JavaScript.</p></noscript>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/js-yaml/4.1.0/js-yaml.min.js"></script>
+  <script src="mascota.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
