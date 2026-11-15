@@ -5,26 +5,17 @@ const TZ = 'America/Mexico_City';
 const CDMX_OFFSET = '-06:00';
 
 const DAYS = ['domingo', 'lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado'];
-const WEEK_ORDER = ['lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo'];
-const DAY_LABELS = {
-  lunes: ['Lunes', 'Понедельник'], martes: ['Martes', 'Вторник'], miercoles: ['Miércoles', 'Среда'],
-  jueves: ['Jueves', 'Четверг'], viernes: ['Viernes', 'Пятница'], sabado: ['Sábado', 'Суббота'],
-  domingo: ['Domingo', 'Воскресенье'],
-};
-const RRULE_DAYS = { lunes: 'MO', martes: 'TU', miercoles: 'WE', jueves: 'TH', viernes: 'FR', sabado: 'SA', domingo: 'SU' };
+const DAY_ES = ['Domingos', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábados'];
+const DAY_RU = ['по воскресеньям', 'по понедельникам', 'по вторникам', 'по средам', 'по четвергам', 'по пятницам', 'по субботам'];
+const RRULE = ['SU', 'MO', 'TU', 'WE', 'TH', 'FR', 'SA'];
 
 const STATES = {
   normal: { es: 'Clases normales', ru: 'Учимся по расписанию' },
   festivo: { es: 'Días festivos', ru: 'Праздники' },
   sin_clases: { es: 'Sin clases', ru: 'Занятий нет' },
 };
-const TYPES = {
-  grupo: ['Grupo', 'Группа'],
-  individual: ['Individual', 'Индивидуально'],
-  disponible: ['Disponible', 'Свободно'],
-};
 
-// ── small helpers ────────────────────────────────────────────────────────────
+// ── helpers ──────────────────────────────────────────────────────────────────
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
@@ -42,7 +33,7 @@ function el(tag, attrs = {}, ...children) {
 }
 
 const ru = (text) => el('span', { class: 'ru', lang: 'ru' }, text);
-const normDay = (s) => String(s ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim();
+const link = (href, text, cls = 'mini') => el('a', { class: cls, href, target: '_blank', rel: 'noopener' }, text);
 const toDate = (v) => (v instanceof Date ? v.toISOString().slice(0, 10) : String(v ?? '').trim());
 const isDate = (s) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 
@@ -62,13 +53,13 @@ function safeUrl(v) {
 }
 
 function cdmxNow() {
-  const parts = Object.fromEntries(
+  const p = Object.fromEntries(
     new Intl.DateTimeFormat('en-CA', {
       timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit',
       hour: '2-digit', minute: '2-digit', hourCycle: 'h23',
-    }).formatToParts(new Date()).map((p) => [p.type, p.value]),
+    }).formatToParts(new Date()).map((x) => [x.type, x.value]),
   );
-  return { date: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+  return { date: `${p.year}-${p.month}-${p.day}`, time: `${p.hour}:${p.minute}` };
 }
 
 function addDays(date, n) {
@@ -77,8 +68,7 @@ function addDays(date, n) {
   return d.toISOString().slice(0, 10);
 }
 
-const weekday = (date) => DAYS[new Date(`${date}T00:00:00Z`).getUTCDay()];
-const instant = (date, time) => new Date(`${date}T${time}:00${CDMX_OFFSET}`);
+const dayIndex = (date) => new Date(`${date}T00:00:00Z`).getUTCDay();
 
 function fmtDate(date, lang) {
   return new Intl.DateTimeFormat(lang === 'ru' ? 'ru-RU' : 'es-MX', {
@@ -86,32 +76,27 @@ function fmtDate(date, lang) {
   }).format(new Date(`${date}T00:00:00Z`));
 }
 
-// "18:00 (CDMX)" plus the viewer's own time when they are elsewhere.
-function localHint(date, time) {
-  const viewerTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+// The class time in the viewer's own zone, or null when that is CDMX time anyway.
+function localTime(date, time) {
+  const at = new Date(`${date}T${time}:00${CDMX_OFFSET}`);
   const fmt = (tz) => new Intl.DateTimeFormat('es-MX', {
     timeZone: tz, weekday: 'short', hour: '2-digit', minute: '2-digit',
-  }).format(instant(date, time));
-  return fmt(viewerTz) === fmt(TZ) ? null : `${fmt(viewerTz)} en tu zona horaria`;
+  }).format(at);
+  const viewer = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  return fmt(viewer) === fmt(TZ) ? null : fmt(viewer);
 }
 
-// ── data normalisation ──────────────────────────────────────────────────────
+// ── data ─────────────────────────────────────────────────────────────────────
 
 function normalise(raw, problems) {
   const data = raw && typeof raw === 'object' ? raw : {};
+  const c = data.clase ?? {};
 
-  const slots = [];
-  (Array.isArray(data.horario) ? data.horario : []).forEach((s, i) => {
-    const slot = {
-      day: normDay(s?.dia), start: toTime(s?.inicio), end: toTime(s?.fin),
-      level: String(s?.nivel ?? ''), type: String(s?.tipo ?? 'grupo').trim(),
-    };
-    if (!DAY_LABELS[slot.day] || !slot.start || !slot.end || !TYPES[slot.type]) {
-      problems.push(`horario #${i + 1}: revisa "dia", "inicio", "fin" y "tipo".`);
-      return;
-    }
-    slots.push(slot);
-  });
+  const day = DAYS.indexOf(String(c.dia ?? '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').trim());
+  const start = toTime(c.inicio);
+  const end = toTime(c.fin);
+  const cls = day >= 0 && start && end ? { day, start, end } : null;
+  if (raw && !cls) problems.push('clase: revisa "dia", "inicio" y "fin".');
 
   const absences = [];
   (Array.isArray(data.ausencias) ? data.ausencias : []).forEach((a, i) => {
@@ -124,27 +109,26 @@ function normalise(raw, problems) {
     absences.push({ from, to, type: a?.tipo === 'festivo' ? 'festivo' : 'sin_clases', reason: String(a?.motivo ?? '') });
   });
 
-  const lessons = (Array.isArray(data.lecciones) ? data.lecciones : [])
-    .filter((l) => l && typeof l === 'object')
-    .map((l) => ({
-      number: l.numero, titleEs: String(l.titulo_es ?? ''), titleRu: String(l.titulo_ru ?? ''),
-      date: toDate(l.fecha), slides: safeUrl(l.presentacion), summary: safeUrl(l.resumen),
-      audio: safeUrl(l.audio), cards: safeUrl(l.tarjetas), homework: safeUrl(l.tarea),
-    }))
-    .sort((a, b) => (Number(b.number) || 0) - (Number(a.number) || 0));
-
   const mode = String(data.estado?.modo ?? 'auto').trim();
   if (mode !== 'auto' && !STATES[mode]) problems.push(`estado.modo "${mode}" no existe; se usa "auto".`);
 
   return {
     mode: STATES[mode] ? mode : 'auto',
     message: String(data.estado?.mensaje ?? '').trim(),
-    link: safeUrl(data.clase?.enlace),
-    platform: String(data.clase?.plataforma ?? '').trim(),
-    code: String(data.clase?.codigo ?? '').trim(),
-    whatsapp: String(data.contacto?.whatsapp ?? '').replace(/\D/g, ''),
+    cls,
+    meet: safeUrl(c.enlace),
+    email: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(data.contacto?.correo ?? '').trim())
+      ? String(data.contacto.correo).trim() : null,
     description: String(data.proyecto?.descripcion ?? '').trim(),
-    slots, absences, lessons,
+    absences,
+    lessons: (Array.isArray(data.lecciones) ? data.lecciones : [])
+      .filter((l) => l && typeof l === 'object')
+      .map((l) => ({
+        number: l.numero, titleEs: String(l.titulo_es ?? ''), titleRu: String(l.titulo_ru ?? ''),
+        date: toDate(l.fecha), slides: safeUrl(l.presentacion), summary: safeUrl(l.resumen),
+        audio: safeUrl(l.audio), homework: safeUrl(l.tarea),
+      }))
+      .sort((a, b) => (Number(b.number) || 0) - (Number(a.number) || 0)),
   };
 }
 
@@ -156,44 +140,39 @@ function currentStatus(d, now) {
   if (d.mode !== 'auto') return { key: d.mode, message: d.message };
   const absence = absenceOn(d, now.date);
   if (!absence) return { key: 'normal', message: d.message };
-  const back = addDays(absence.to, 1);
+  const back = nextClass(d, { date: addDays(absence.to, 1), time: '00:00' });
   return {
     key: absence.type,
-    message: d.message || [absence.reason, `Regresamos el ${fmtDate(back, 'es')}.`, `Возвращаемся: ${fmtDate(back, 'ru')}.`]
-      .filter(Boolean).join(' '),
+    message: d.message || [absence.reason, back && `Regresamos el ${fmtDate(back.date, 'es')}.`,
+      back && `Возвращаемся: ${fmtDate(back.date, 'ru')}.`].filter(Boolean).join(' '),
   };
 }
 
+// The next class that is not cancelled, starting from `now`.
 function nextClass(d, now) {
-  if (d.mode === 'festivo' || d.mode === 'sin_clases') return null;
-  for (let i = 0; i < 28; i++) {
+  if (!d.cls) return null;
+  for (let i = 0; i < 120; i++) {
     const date = addDays(now.date, i);
-    if (absenceOn(d, date)) continue;
-    const today = d.slots
-      .filter((s) => s.day === weekday(date) && s.type !== 'disponible')
-      .sort((a, b) => a.start.localeCompare(b.start));
-    for (const slot of today) {
-      if (i === 0 && slot.end <= now.time) continue;
-      return { slot, date, live: i === 0 && slot.start <= now.time };
-    }
+    if (dayIndex(date) !== d.cls.day || absenceOn(d, date)) continue;
+    if (i === 0 && d.cls.end <= now.time) continue;
+    return { date, live: i === 0 && d.cls.start <= now.time };
   }
   return null;
 }
 
-function calendarUrl(slot, d, now) {
+function calendarUrl(d, now) {
   let date = now.date;
-  while (weekday(date) !== slot.day) date = addDays(date, 1);
+  while (dayIndex(date) !== d.cls.day) date = addDays(date, 1);
   const stamp = (t) => `${date.replaceAll('-', '')}T${t.replace(':', '')}00`;
-  const params = new URLSearchParams({
+  return `https://calendar.google.com/calendar/render?${new URLSearchParams({
     action: 'TEMPLATE',
-    text: `Clase de ruso — ${slot.level}`.trim(),
-    dates: `${stamp(slot.start)}/${stamp(slot.end)}`,
+    text: 'Clase de ruso con Slaviana',
+    dates: `${stamp(d.cls.start)}/${stamp(d.cls.end)}`,
     ctz: TZ,
-    recur: `RRULE:FREQ=WEEKLY;BYDAY=${RRULE_DAYS[slot.day]}`,
-    details: `${location.href}${d.link ? `\n${d.link}` : ''}`,
-    location: d.link ?? '',
-  });
-  return `https://calendar.google.com/calendar/render?${params}`;
+    recur: `RRULE:FREQ=WEEKLY;BYDAY=${RRULE[d.cls.day]}`,
+    details: `${d.meet ?? ''}\n${location.href}`.trim(),
+    location: d.meet ?? '',
+  })}`;
 }
 
 // Google Slides / Canva share links → embeddable URLs; anything else as is.
@@ -209,95 +188,45 @@ function embedUrl(url) {
 
 function renderStatus(d, now) {
   const status = currentStatus(d, now);
-  const label = STATES[status.key];
   const next = status.key === 'normal' ? nextClass(d, now) : null;
 
   let nextLine = null;
   if (next?.live) {
     nextLine = el('p', { class: 'proxima en-vivo' }, '¡La clase está en curso! ', ru('Урок идёт!'));
   } else if (next) {
-    const hint = localHint(next.date, next.slot.start);
+    const local = localTime(next.date, d.cls.start);
     nextLine = el('p', { class: 'proxima' },
-      el('strong', {}, 'Próxima clase: '),
-      `${fmtDate(next.date, 'es')}, ${next.slot.start} (CDMX) · ${next.slot.level}`,
-      hint && el('span', { class: 'local' }, ` — ${hint}`));
+      el('strong', {}, 'Próxima clase: '), `${fmtDate(next.date, 'es')}, ${d.cls.start} (CDMX)`,
+      local && el('span', { class: 'local' }, ` — ${local} en tu zona horaria`));
   }
 
-  document.getElementById('estado').replaceChildren(
+  const box = document.getElementById('estado');
+  box.dataset.estado = status.key;
+  box.replaceChildren(
     el('div', { class: 'mascota' }),
     el('div', { class: 'texto' },
-      el('p', { class: `semaforo ${status.key}` }, el('span', { class: 'luz', 'aria-hidden': 'true' }), label.es),
-      el('p', { class: 'ru grande', lang: 'ru' }, label.ru),
+      el('p', { class: `semaforo ${status.key}` }, el('span', { class: 'luz', 'aria-hidden': 'true' }), STATES[status.key].es),
+      el('p', { class: 'ru grande', lang: 'ru' }, STATES[status.key].ru),
       status.message && el('p', { class: 'mensaje' }, status.message),
       nextLine),
   );
-  document.querySelector('#estado .mascota').innerHTML = Mascota[status.key]();
-  document.getElementById('estado').dataset.estado = status.key;
+  box.querySelector('.mascota').innerHTML = Mascota[status.key]();
 }
 
-function renderJoin(d) {
-  const button = d.link
-    ? el('a', { class: 'boton-entrar', href: d.link, target: '_blank', rel: 'noopener' },
+function renderClass(d, now) {
+  const button = d.meet
+    ? el('a', { class: 'boton-entrar', href: d.meet, target: '_blank', rel: 'noopener' },
       'Entrar a la clase', ru('Войти на урок'))
     : el('span', { class: 'boton-entrar desactivado', 'aria-disabled': 'true' },
       'Enlace pendiente', ru('Ссылка скоро появится'));
-  document.getElementById('entrar').replaceChildren(
-    button,
-    el('p', { class: 'nota' },
-      d.platform && `${d.platform}. `,
-      d.code && el('span', {}, 'Código de acceso: ', el('code', {}, d.code), '. '),
-      'Horario: Centro de México (CDMX).'),
-  );
-}
 
-function renderSchedule(d, now) {
-  const container = document.getElementById('horario');
-  const filters = document.getElementById('filtros');
-  const present = Object.keys(TYPES).filter((t) => d.slots.some((s) => s.type === t));
-  let active = 'todos';
+  const when = d.cls && el('div', { class: 'tarjeta horario' },
+    el('p', { class: 'cuando' }, `${DAY_ES[d.cls.day]}, ${d.cls.start}–${d.cls.end}`),
+    el('p', {}, ru(`${DAY_RU[d.cls.day]}, ${d.cls.start}–${d.cls.end}`)),
+    el('p', { class: 'nota' }, 'Clase grupal en Google Meet · Hora del Centro de México (CDMX)'),
+    link(calendarUrl(d, now), '+ Añadir a Google Calendar'));
 
-  const draw = () => {
-    const shown = d.slots.filter((s) => active === 'todos' || s.type === active);
-    const days = WEEK_ORDER.filter((day) => shown.some((s) => s.day === day));
-    if (!days.length) {
-      container.replaceChildren(el('p', { class: 'vacio' }, 'Aún no hay horario. ', ru('Расписание скоро появится.')));
-      return;
-    }
-    container.replaceChildren(...days.map((day) => el('article', { class: 'dia' },
-      el('h3', {}, DAY_LABELS[day][0], ' ', ru(DAY_LABELS[day][1])),
-      shown.filter((s) => s.day === day).sort((a, b) => a.start.localeCompare(b.start)).map((s) => {
-        const ask = s.type === 'disponible' && d.whatsapp
-          ? el('a', {
-            class: 'mini', target: '_blank', rel: 'noopener',
-            href: `https://wa.me/${d.whatsapp}?text=${encodeURIComponent(`¡Hola! Me gustaría el horario del ${DAY_LABELS[day][0].toLowerCase()} ${s.start}.`)}`,
-          }, 'Pedir este horario')
-          : null;
-        const add = s.type !== 'disponible'
-          ? el('a', { class: 'mini', href: calendarUrl(s, d, now), target: '_blank', rel: 'noopener' }, '+ Google Calendar')
-          : null;
-        return el('div', { class: `franja ${s.type}` },
-          el('span', { class: 'hora' }, `${s.start}–${s.end}`),
-          el('span', { class: 'nivel' }, s.level),
-          el('span', { class: `etiqueta ${s.type}` }, TYPES[s.type][0]),
-          add, ask);
-      }))));
-  };
-
-  filters.replaceChildren();
-  if (present.length > 1) {
-    for (const key of ['todos', ...present]) {
-      const text = key === 'todos' ? 'Todos' : TYPES[key][0];
-      filters.append(el('button', {
-        type: 'button', class: 'chip', 'aria-pressed': String(key === active),
-        onclick: (e) => {
-          active = key;
-          filters.querySelectorAll('.chip').forEach((b) => b.setAttribute('aria-pressed', String(b === e.currentTarget)));
-          draw();
-        },
-      }, text));
-    }
-  }
-  draw();
+  document.getElementById('clase').replaceChildren(button, when);
 }
 
 function renderLessons(d) {
@@ -308,46 +237,60 @@ function renderLessons(d) {
   }
   container.replaceChildren(...d.lessons.map((l) => {
     const viewer = el('div', { class: 'visor', hidden: true });
-    const links = [
-      l.slides && el('button', {
-        type: 'button', class: 'mini',
-        onclick: (e) => {
-          const open = viewer.hidden;
-          if (open && !viewer.firstChild) {
-            viewer.append(
-              el('iframe', { src: embedUrl(l.slides), title: `Presentación: ${l.titleEs}`, loading: 'lazy', allowfullscreen: true }),
-              el('a', { href: l.slides, target: '_blank', rel: 'noopener' }, 'Abrir en otra pestaña'),
-            );
-          }
-          viewer.hidden = !open;
-          e.currentTarget.textContent = open ? 'Ocultar presentación' : 'Ver presentación';
-        },
-      }, 'Ver presentación'),
-      l.summary && el('a', { class: 'mini', href: l.summary, target: '_blank', rel: 'noopener' }, 'Descargar resumen'),
-      l.cards && el('a', { class: 'mini', href: l.cards, target: '_blank', rel: 'noopener' }, 'Tarjetas'),
-      l.homework && el('a', { class: 'mini', href: l.homework, target: '_blank', rel: 'noopener' }, 'Tarea'),
-    ];
+    const toggle = l.slides && el('button', {
+      type: 'button', class: 'mini',
+      onclick: (e) => {
+        if (!viewer.firstChild) {
+          viewer.append(
+            el('iframe', { src: embedUrl(l.slides), title: `Presentación: ${l.titleEs}`, loading: 'lazy', allowfullscreen: true }),
+            link(l.slides, 'Abrir en otra pestaña', null),
+          );
+        }
+        viewer.hidden = !viewer.hidden;
+        e.currentTarget.textContent = viewer.hidden ? 'Ver presentación' : 'Ocultar presentación';
+      },
+    }, 'Ver presentación');
     const audio = l.audio && (/\.(mp3|m4a|ogg|wav)(\?|$)/i.test(l.audio)
       ? el('audio', { controls: true, preload: 'none', src: l.audio })
-      : el('a', { class: 'mini', href: l.audio, target: '_blank', rel: 'noopener' }, 'Audio'));
+      : link(l.audio, 'Audio'));
     return el('article', { class: 'leccion' },
       el('p', { class: 'numero' }, l.number != null ? `Lección ${l.number}` : 'Lección',
         isDate(l.date) && el('span', { class: 'fecha' }, ` · ${fmtDate(l.date, 'es')}`)),
       el('h3', {}, l.titleEs),
       l.titleRu && el('p', { class: 'ru', lang: 'ru' }, l.titleRu),
-      el('div', { class: 'acciones' }, links, audio),
+      el('div', { class: 'acciones' },
+        toggle,
+        l.summary && link(l.summary, 'Descargar resumen'),
+        l.homework && link(l.homework, 'Tarea'),
+        audio),
       viewer);
   }));
 }
 
+// The feedback form opens the student's mail app with the message filled in:
+// no server and no third-party form service.
+function renderContact(d) {
+  const section = document.getElementById('contacto');
+  if (!d.email) {
+    section.hidden = true;
+    return;
+  }
+  document.getElementById('correo').replaceChildren(el('a', { href: `mailto:${d.email}` }, d.email));
+  document.getElementById('formulario').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const form = e.currentTarget;
+    const name = form.nombre.value.trim();
+    const body = `${form.mensaje.value.trim()}${name ? `\n\n— ${name}` : ''}`;
+    const subject = `Clases de ruso${name ? ` — ${name}` : ''}`;
+    location.href = `mailto:${d.email}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+  });
+}
+
 function renderProblems(problems) {
-  const box = document.getElementById('problemas');
   if (!problems.length) return;
+  const box = document.getElementById('problemas');
   box.hidden = false;
-  box.replaceChildren(
-    el('strong', {}, 'Revisa datos.yml'),
-    el('ul', {}, problems.map((p) => el('li', {}, p))),
-  );
+  box.replaceChildren(el('strong', {}, 'Revisa datos.yml'), el('ul', {}, problems.map((p) => el('li', {}, p))));
 }
 
 async function main() {
@@ -364,9 +307,9 @@ async function main() {
   const now = cdmxNow();
   renderProblems(problems);
   renderStatus(d, now);
-  renderJoin(d);
-  renderSchedule(d, now);
+  renderClass(d, now);
   renderLessons(d);
+  renderContact(d);
   document.getElementById('descripcion').textContent = d.description;
 }
 

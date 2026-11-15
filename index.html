@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Aprende ruso con Slaviana</title>
-  <meta name="description" content="Clases de ruso gratuitas para estudiantes de México: horario, estado de las clases, enlace a la clase y materiales.">
+  <meta name="description" content="Clases de ruso gratuitas para estudiantes de México: estado de las clases, enlace a la clase y materiales.">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🐻</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -24,18 +24,26 @@
       <p class="cargando">Cargando… / Загрузка…</p>
     </section>
 
-    <section id="entrar" class="entrar"></section>
-
-    <section class="bloque">
-      <h2>Horario <span class="ru" lang="ru">Расписание</span></h2>
-      <p class="nota">Hora del Centro de México (CDMX).</p>
-      <div id="filtros" class="filtros" role="group" aria-label="Filtrar horario"></div>
-      <div id="horario" class="horario"></div>
-    </section>
+    <section id="clase" class="clase"></section>
 
     <section class="bloque">
       <h2>Materiales <span class="ru" lang="ru">Материалы</span></h2>
       <div id="lecciones" class="lecciones"></div>
+    </section>
+
+    <section id="contacto" class="bloque">
+      <h2>Escríbeme <span class="ru" lang="ru">Напиши мне</span></h2>
+      <p class="nota">Preguntas, ideas o comentarios: <span id="correo"></span></p>
+      <form id="formulario" class="tarjeta formulario">
+        <label><span>Tu nombre <span class="opcional">(opcional)</span></span>
+          <input name="nombre" autocomplete="name">
+        </label>
+        <label>Mensaje
+          <textarea name="mensaje" rows="4" required></textarea>
+        </label>
+        <button type="submit" class="boton">Enviar <span lang="ru">· Отправить</span></button>
+        <p class="nota">Se abrirá tu aplicación de correo con el mensaje listo.</p>
+      </form>
     </section>
   </main>
 

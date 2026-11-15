@@ -21,9 +21,12 @@ updates within a few minutes, and this works from a phone too.
 | Announce a holiday or a day off ahead of time | add an entry under `ausencias` (`desde`, `hasta`, `tipo`, `motivo`) |
 | Cancel class right now (e.g. you are ill) | set `estado.modo: sin_clases`, and set it back to `auto` afterwards |
 | Show a short note under the status | `estado.mensaje` |
-| Set the video-call link | `clase.enlace` (and `clase.codigo` if there is one) |
-| Change the schedule | the `horario` list |
+| Change the class day, time or Google Meet link | `clase` (`dia`, `inicio`, `fin`, `enlace`) |
+| Change the contact address | `contacto.correo` |
 | Publish a new lesson | add an entry under `lecciones` |
+
+The "Escríbeme" form at the bottom needs no server: it opens the student's
+mail app with the message ready to send to `contacto.correo`.
 
 With `modo: auto` the status turns green, yellow or red on its own based on
 the `ausencias` dates. The "next class" line also skips those days, and on
